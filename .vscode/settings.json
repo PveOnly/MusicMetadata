@@ -1,0 +1,19 @@
+{
+    "python.linting.enabled": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.linting.pylintEnabled": true,
+    "isort.args": [
+        "--profile", "black"
+    ],
+    "terminal.integrated.env.windows": {"PYTHONPATH": "${workspaceFolder}:${cwd}"},
+    "[python]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.formatOnSave": true,
+        "editor.wordBasedSuggestions": "matchingDocuments",
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+        "editor.maxTokenizationLineLength": 20000
+    },
+}
