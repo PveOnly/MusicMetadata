@@ -3,7 +3,7 @@ from pytube import YouTube
 import numpy as np
 import json
 from global_jsonencoder import GlobalEncoder
-from genius_scrapping import get_metadata_music
+from genius_scrapping import get_metadata_music,get_metadata_discogs
 import eyed3
 import subprocess
 from utils import sanitize_name
@@ -46,6 +46,7 @@ def from_metadata_update_mp3_video(input_path, metadata_dict):
     mapping_metadata=['author','Album','Genre','publish_date','title','watch_url']
     eyed3_metadata=  ['artist','album','genre','release_date','title','internet_radio_url']
     mapping_data={key:val for key,val in zip(eyed3_metadata,mapping_metadata,strict=True)}
+    breakpoint()
     path_mp3=convert_path_to_mp3_path(input_path)
     audiofile = eyed3.load(path_mp3)
     audiofile.initTag(version=(2, 3, 0))  # version is important
@@ -149,6 +150,9 @@ def convert_mp4_to_mp3(input_file:Path):
 def convert_path_to_mp3_path(input_path:Path) -> Path:
     return input_path.parent/f'{input_path.stem}.mp3'
 
+def is_dict_has_none_key(dict_metadata: dict) -> bool:
+    return None in dict_metadata.keys()
+
 def main():
     # Example usage
     list_youtube_url = [
@@ -169,17 +173,22 @@ def main():
         # def get maximun extra_data
         full_title=video_metadata['author']+" "+video_metadata['title']
         extra_metadata_google = get_metadata_music(full_title)
-
-        if extra_metadata_google["Genre"] is None:
+        
+        if is_dict_has_none_key(video_metadata):
             full_title=video_metadata['author']+" "+video_metadata['title'] + " GENRE"
             get_genre_metadata = get_metadata_music(full_title)['Genre']
             extra_metadata_google['Genre']=get_genre_metadata
+            video_metadata.update(extra_metadata_google)
+
+        if is_dict_has_none_key(video_metadata):
+            full_title=video_metadata['author']+" "+video_metadata['title']
+            extra_metadata=get_metadata_discogs(full_title)
+            video_metadata.update(extra_metadata_google)
 
         if not extra_metadata_google:
             print("Found no extra_metadata_google")
         else:
             print(extra_metadata_google)
-        video_metadata.update(extra_metadata_google)
         convert_mp4_to_mp3(path_to_video)
         from_metadata_update_mp3_video(path_to_video, video_metadata)
         print("###")

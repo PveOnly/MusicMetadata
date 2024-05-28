@@ -74,3 +74,22 @@ def sanitize_name(dir_name):
     dir_name = "".join(char for char in dir_name if ord(char) < 128)
 
     return dir_name
+
+def flatten_dict(d, parent_key='', sep='.'):
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        elif isinstance(v, list):
+            for i, item in enumerate(v):
+                if isinstance(item, dict):
+                    items.extend(flatten_dict(item, f"{new_key}[{i}]", sep=sep).items())
+                else:
+                    items.append((f"{new_key}[{i}]", item))
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+def is_dict_has_none_key(dict_metadata: dict) -> bool:
+        return None in dict_metadata.keys()

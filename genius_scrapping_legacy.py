@@ -58,6 +58,7 @@ def fetch_and_parse_url(url, mode="selenium"):
 
         # Send GET request with custom headers
         response = requests.get(url, headers=headers, cookies=cookies)
+        breakpoint()
         # response.raise_for_status()  # Raises an HTTPError for bad responses
         page_source_text = response.text
 
@@ -174,4 +175,11 @@ def test():
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
-test()
+
+def test_1():
+    url="https://www.discogs.com/fr/release/30384242-Sokuu-Solanin"
+    soup_object = fetch_and_parse_url(url, mode="request")
+    parsed_content = soup_object.prettify()
+    save_to_file(parsed_content, "parsed_content.html")
+    print("Content parsed and saved successfully.")
+test_1()
