@@ -1,0 +1,9 @@
+mp3_file
+.venv
+__pycache__
+*.json
+*.mp3
+*.jpg
+*.html
+*.mp4
+*.txt
