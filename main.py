@@ -73,6 +73,7 @@ def main():
          "https://www.youtube.com/watch?v=Q7yppe2b6II"
     ]
     DUMP_JSON=False
+    REMOVE_MP4=True
     for youtube_url in list_youtube_url:
         output_dir=Path('mp3_file')
         output_dir.mkdir(exist_ok=True)
@@ -95,6 +96,9 @@ def main():
             metadata_video_eyed3.get_metadata_disco(title_music)
         # metadata_video_eyed3.show()
         convert_mp4_to_mp3(path_to_video)
+        if REMOVE_MP4:
+            if path_to_video.exists():
+                path_to_video.unlink()
         metadata_video_eyed3.from_metadata_update_mp3_video(path_to_video)
         print("###")
         # break
