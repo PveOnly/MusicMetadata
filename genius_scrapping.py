@@ -30,10 +30,18 @@ class MetadataEYED:
     def __init__(self) -> None:
         self._metadata=MetadataEYED.METADATA_TEMPLATE.copy()
 
-    def show(self):
+    def show(self,only_none=False):
         for key,val in self.metadata.items():
-            print(f'{key} : {val}')
-            
+            if only_none:
+                if val is None:
+                    print(f'{key} : {val}')
+            else:
+                print(f'{key} : {val}')
+
+    def is_metadata_complete(self) ->bool:
+        self.show(only_none=True)
+        return is_dict_has_none_key(self.metadata)
+    
     @property
     def metadata(self) -> dict:
         return self._metadata

@@ -14,6 +14,7 @@ from eyed3.id3.frames import ImageFrame
 from eyed3.id3.tag import ImagesAccessor
 from PIL import Image
 import io
+from genius_scrapping import MetadataEYED
 
 def download_image_to_memory(image_url):
     # Send an HTTP GET request to the image URL
@@ -46,9 +47,10 @@ def from_metadata_update_mp3_video(input_path, metadata_dict):
     mapping_metadata=['author','Album','Genre','publish_date','title','watch_url']
     eyed3_metadata=  ['artist','album','genre','release_date','title','internet_radio_url']
     mapping_data={key:val for key,val in zip(eyed3_metadata,mapping_metadata,strict=True)}
-    breakpoint()
     path_mp3=convert_path_to_mp3_path(input_path)
     audiofile = eyed3.load(path_mp3)
+    assert audiofile is not None,'AudioFile is None'
+    assert audiofile.tag is not None,'AudioFile.tag is None'
     audiofile.initTag(version=(2, 3, 0))  # version is important
     if audiofile is None:
         raise Exception('Error wrong conversion to mp3')
@@ -166,29 +168,26 @@ def main():
          "https://www.youtube.com/watch?v=Q7yppe2b6II"
     ]
     for youtube_url in list_youtube_url:
+        metadata_video_eyed3=MetadataEYED()
         print(f"{youtube_url}")
         output_dir=Path('mp3_file')
         output_dir.mkdir(exist_ok=True)
         path_to_video,video_metadata=download_video(youtube_url, output_dir)
+        metadata_video_eyed3.from_dict_metadata_update_self_metadata(video_metadata,force_replace=False)
         # def get maximun extra_data
-        full_title=video_metadata['author']+" "+video_metadata['title']
-        extra_metadata_google = get_metadata_music(full_title)
+        author=video_metadata['author']
+        title=video_metadata['title']
+        assert title is not None, 'Careful title is None'
+        assert author is not None,'Carefull author is None'
+        title_music=f"{author} {title}"
+        metadata_video_eyed3.get_metadata_google(title_music)
         
-        if is_dict_has_none_key(video_metadata):
-            full_title=video_metadata['author']+" "+video_metadata['title'] + " GENRE"
-            get_genre_metadata = get_metadata_music(full_title)['Genre']
-            extra_metadata_google['Genre']=get_genre_metadata
-            video_metadata.update(extra_metadata_google)
+        if metadata_video_eyed3.is_metadata_complete():
+            metadata_video_eyed3.get_metadata_google(f"{author} {title} GENRE")
 
-        if is_dict_has_none_key(video_metadata):
-            full_title=video_metadata['author']+" "+video_metadata['title']
-            extra_metadata=get_metadata_discogs(full_title)
-            video_metadata.update(extra_metadata_google)
+        if metadata_video_eyed3.is_metadata_complete():
+            metadata_video_eyed3.get_metadata_disco(title_music)
 
-        if not extra_metadata_google:
-            print("Found no extra_metadata_google")
-        else:
-            print(extra_metadata_google)
         convert_mp4_to_mp3(path_to_video)
         from_metadata_update_mp3_video(path_to_video, video_metadata)
         print("###")
