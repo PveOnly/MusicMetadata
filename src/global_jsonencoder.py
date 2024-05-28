@@ -1,9 +1,8 @@
-import numpy as np
 from abc import ABCMeta
 
-from json.encoder import (_make_iterencode, JSONEncoder,
-                          encode_basestring_ascii, INFINITY,
-                          c_make_encoder, encode_basestring)
+# from json.encoder import (_make_iterencode, JSONEncoder,
+#                           encode_basestring_ascii, INFINITY,
+#                           c_make_encoder, encode_basestring)
 
 class SlicedStr(str):
     def __new__(cls, value, max_length=10):

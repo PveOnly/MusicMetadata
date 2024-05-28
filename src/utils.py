@@ -17,7 +17,7 @@ def find_closest_match(string_ref, string_list):
 
 def convert_mp4_to_mp3(input_file:Path):
     output_file=convert_path_to_mp3_path(input_file)
-    cmd_ffmpeg=["ffmpeg","-y" ,"-i"]
+    cmd_ffmpeg=["ffmpeg","-hide_banner","-loglevel","error","-y" ,"-i"]
     # if output_file.exists():
     #     cmd_ffmpeg.append('-y')
     if output_file.exists():
