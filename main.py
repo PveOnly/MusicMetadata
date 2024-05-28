@@ -72,7 +72,7 @@ def main():
          "https://www.youtube.com/watch?v=a5InofcZEHQ",
          "https://www.youtube.com/watch?v=Q7yppe2b6II"
     ]
-    DUMP_JSON=True
+    DUMP_JSON=False
     for youtube_url in list_youtube_url:
         output_dir=Path('mp3_file')
         output_dir.mkdir(exist_ok=True)
