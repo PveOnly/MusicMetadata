@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 from pytube import YouTube
-from utils import flatten_dict, sanitize_name,convert_mp4_to_mp3
-from genius_scrapping import MetadataEYED
+from src.utils import flatten_dict, sanitize_name,convert_mp4_to_mp3
+from src.genius_scrapping import MetadataEYED
 
 def download_video(url, output_path:Path,filename: str|None=None,force=False):
     # Create YouTube object

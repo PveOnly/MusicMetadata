@@ -5,7 +5,7 @@ import eyed3
 import requests
 from bs4 import BeautifulSoup
 
-from utils import (
+from src.utils import (
     convert_path_to_mp3_path,
     download_image_to_memory,
     flatten_dict,

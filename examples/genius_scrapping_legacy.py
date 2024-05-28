@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from utils import find_closest_match
+from src.utils import find_closest_match
 import unicodedata
 # from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
