@@ -10,7 +10,7 @@
         "diffEditor.ignoreTrimWhitespace": false,
         "editor.formatOnSave": true,
         "editor.wordBasedSuggestions": "matchingDocuments",
-        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.codeActionsOnSave": {
             "source.organizeImports": "explicit"
         },
