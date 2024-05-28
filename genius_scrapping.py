@@ -1,21 +1,30 @@
 import json
 import unicodedata
 
+import eyed3
 import requests
 from bs4 import BeautifulSoup
 
-from utils import flatten_dict, get_close_matches, is_dict_has_none_key
+from utils import (
+    convert_path_to_mp3_path,
+    download_image_to_memory,
+    flatten_dict,
+    get_close_matches,
+    is_dict_has_none_key,
+)
 
 
 class MetadataEYED:
     # Mapping of base keys and their aliases
     MAPPING_KEYS = {
-        'artist': ['artist','Artist', 'author','releaseOf.byArtist[0].name',''],
+        'artist': ['artist','Artist', 'author','releaseOf.byArtist[0].name','_vid_info.videoDetails.author'],
         'album': ['album','Album','releaseOf.name'],
         'genre': ['genre','Genre','genre[0]'],
-        'release_date': ['release_date','Release_date','releaseOf.datePublished'],
-        'title': ['title','Title'],
-        'internet_radio_url': ['internet_radio_url','Internet_radio_url']
+        'release_date': ['release_date','Release_date','releaseOf.datePublished','_publish_date','publish_date'],
+        'title': ['title','Title','_title'],
+        'internet_radio_url': ['internet_radio_url','Internet_radio_url','watch_url'],
+        'images':['thumbnail_url'],
+        # 'thumbnail_url':['thumbnail_url']
     }
     METADATA_TEMPLATE={
         'artist':None ,
@@ -24,8 +33,9 @@ class MetadataEYED:
         'release_date':None ,
         'title':None ,
         'internet_radio_url':None ,
-        'images':None
+        'images':None,
     }
+    KEYS_TO_SKIP=['images']
 
     def __init__(self) -> None:
         self._metadata=MetadataEYED.METADATA_TEMPLATE.copy()
@@ -37,9 +47,20 @@ class MetadataEYED:
                     print(f'{key} : {val}')
             else:
                 print(f'{key} : {val}')
-
+    @property
+    def artist(self):
+        val= self.metadata['artist']
+        assert val is not None
+        return val
+    
+    @property
+    def title(self):
+        val= self.metadata['title']
+        assert val is not None
+        return val
+    
     def is_metadata_complete(self) ->bool:
-        self.show(only_none=True)
+        # self.show(only_none=True)
         return is_dict_has_none_key(self.metadata)
     
     @property
@@ -61,6 +82,8 @@ class MetadataEYED:
             for key_eyed,list_other_possible_key_name in MetadataEYED.MAPPING_KEYS.items():
                 if key_metadata in list_other_possible_key_name:
                     val_metadata=str(val_metadata).strip()
+                    if key_eyed not in ['internet_radio_url','images']:
+                        val_metadata=val_metadata.lower()
                     if self.metadata[key_eyed] is None or force_replace:
                         self.metadata[key_eyed]=val_metadata
                     else:
@@ -92,6 +115,28 @@ class MetadataEYED:
     def normalize_dict(dict_to_normalize):
         print('pass')
 
+    def from_metadata_update_mp3_video(self,input_path):
+        # mapping_metadata=['author','Album','Genre','publish_date','title','watch_url']
+        # eyed3_metadata=  ['artist','album','genre','release_date','title','internet_radio_url']
+        # mapping_data={key:val for key,val in zip(eyed3_metadata,mapping_metadata,strict=True)}
+        path_mp3=convert_path_to_mp3_path(input_path)
+        audiofile = eyed3.load(path_mp3)
+        assert audiofile is not None,'AudioFile is None'
+        assert audiofile.tag is not None,'AudioFile.tag is None'
+        audiofile.initTag(version=(2, 3, 0))  # version is important
+        if audiofile is None:
+            raise Exception('Error wrong conversion to mp3')
+        # breakpoint()
+        for key, val in self.metadata.items():
+            if key in MetadataEYED.KEYS_TO_SKIP:
+                continue
+            setattr(audiofile.tag, key, val)
+        
+        thumbnail_url=self.metadata['images']
+        imagedata=download_image_to_memory(thumbnail_url)
+        audiofile.tag.images.set(3, imagedata, "image/jpeg", "cover")
+        audiofile.tag.save()
+        print("Updated Metadata")
 
 def fetch_and_parse_url(url):
     headers = {
