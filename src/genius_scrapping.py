@@ -1,5 +1,7 @@
 import json
+import re
 import unicodedata
+from pathlib import Path
 
 import eyed3
 import requests
@@ -11,16 +13,17 @@ from src.utils import (
     flatten_dict,
     get_close_matches,
     is_dict_has_none_key,
+    sanitize_name,
 )
 
 
 class MetadataEYED:
     # Mapping of base keys and their aliases
     MAPPING_KEYS = {
-        'artist': ['artist','Artist', 'author','releaseOf.byArtist[0].name','_vid_info.videoDetails.author'],
-        'album': ['album','Album','releaseOf.name'],
-        'genre': ['genre','Genre','genre[0]'],
-        'release_date': ['release_date','Release_date','releaseOf.datePublished','_publish_date','publish_date'],
+        'artist': ['artist','Artist', 'author','releaseOf.byArtist[0].name','_vid_info.videoDetails.author',"kc:/music/recording_cluster:artist"],
+        'album': ['album','Album','releaseOf.name',"kc:/music/recording_cluster:first album"],
+        'genre': ['genre','Genre','genre[0]',"kc:/music/recording_cluster:skos_genre","kc:/music/album:skos genre","kc:/music/artist:skos genre"],
+        'release_date': ['release_date','Release_date','releaseOf.datePublished','_publish_date','publish_date',"kc:/music/recording_cluster:release date"],
         'title': ['title','Title','_title'],
         'internet_radio_url': ['internet_radio_url','Internet_radio_url','watch_url'],
         'images':['thumbnail_url'],
@@ -35,10 +38,13 @@ class MetadataEYED:
         'internet_radio_url':None ,
         'images':None,
     }
-    KEYS_TO_SKIP=['images']
+    METADATA_MINIMA_KEYS_TO_BE_SET=["artist","album","release_date","title","genre"]
+    KEYS_TO_SKIP_TO_SET_EYED3=['images']
 
-    def __init__(self) -> None:
+    def __init__(self,output_path:Path|None=None,dump_json=True) -> None:
         self._metadata=MetadataEYED.METADATA_TEMPLATE.copy()
+        self.output_path=output_path
+        self.dump_json=dump_json
 
     def show(self,only_none=False):
         for key,val in self.metadata.items():
@@ -57,11 +63,23 @@ class MetadataEYED:
     def title(self):
         val= self.metadata['title']
         assert val is not None
+        for val_remove in ['(clip officiel)',self.artist]:
+            val=val.replace(val_remove,'')
         return val
     
-    def is_metadata_complete(self) ->bool:
+    def is_metadata_complete(self,minimal_key=True) ->bool:
         # self.show(only_none=True)
-        return is_dict_has_none_key(self.metadata)
+        if minimal_key:
+            values_list=[]
+            for key in self.METADATA_MINIMA_KEYS_TO_BE_SET:
+                val=self.metadata[key]
+                values_list.append(val)
+            if None in values_list:
+                return False
+            else:
+                return True
+        else:
+            return None not in self.metadata.values()
     
     @property
     def metadata(self) -> dict:
@@ -75,7 +93,7 @@ class MetadataEYED:
         # Additional checks or transformations could be added here
         self._metadata = value
 
-    def from_dict_metadata_update_self_metadata(self,dict_metadata,force_replace=False):
+    def from_dict_metadata_update_self_metadata(self,dict_metadata,force_replace=False,mute=True):
         for key_metadata,val_metadata in dict_metadata.items():
             if val_metadata is None:
                 continue
@@ -88,7 +106,8 @@ class MetadataEYED:
                         self.metadata[key_eyed]=val_metadata
                     else:
                         if val_metadata!=self.metadata[key_eyed]:
-                            print(f"Strange {val_metadata} is different than current value {self.metadata[key_eyed]}")
+                            if not mute:
+                                print(f"Strange {val_metadata} is different than current value {self.metadata[key_eyed]}")
 
     def normalize(self,dict_metadata):
         self.from_dict_metadata_update_self_metadata(dict_metadata,force_replace=False)
@@ -98,6 +117,8 @@ class MetadataEYED:
     def get_metadata_google(self,name_music):
         dict_metadata=get_metadata_music(name_music)
         dict_metadata=flatten_dict(dict_metadata)
+        filename_music=sanitize_name(name_music)
+        self.save_dict(dict_metadata,f'{filename_music}_extract_metadata_google.json')
         self.normalize(dict_metadata)
         return dict_metadata
     
@@ -105,15 +126,18 @@ class MetadataEYED:
     def get_metadata_disco(self,name_music):
         dict_metadata=get_metadata_discogs(name_music)
         dict_metadata=flatten_dict(dict_metadata)
+        filename_music=sanitize_name(name_music)
+        self.save_dict(dict_metadata,f'{filename_music}_extract_metadata_disco.json')
         self.normalize(dict_metadata)
         # discogs_metadata=['releaseOf.byArtist[0].name','releaseOf.name','genre[0]','releaseOf.datePublished']
         # eyed3_metadata=  ['artist','album','genre','release_date']
         # dict_release_mapped_to_eyed3=from_two_list_create_new_dict(eyed3_metadata,discogs_metadata,dict_metadata)
         return dict_metadata
     
-    @staticmethod
-    def normalize_dict(dict_to_normalize):
-        print('pass')
+    def save_dict(self,dict_metadata,filename):
+        if self.dump_json:
+            filepath=self.output_path/filename
+            json.dump(dict_metadata,open(filepath,'w',encoding='utf-8'),indent=4,default=str)
 
     def from_metadata_update_mp3_video(self,input_path):
         # mapping_metadata=['author','Album','Genre','publish_date','title','watch_url']
@@ -128,7 +152,7 @@ class MetadataEYED:
             raise Exception('Error wrong conversion to mp3')
         # breakpoint()
         for key, val in self.metadata.items():
-            if key in MetadataEYED.KEYS_TO_SKIP:
+            if key in MetadataEYED.KEYS_TO_SKIP_TO_SET_EYED3:
                 continue
             setattr(audiofile.tag, key, val)
         
@@ -165,26 +189,25 @@ def get_metadata_music(music_name):
     try:
         # find closest music link
         soup_object = fetch_and_parse_url(url)
-        data_to_find = {
-            "artist": "kc:/music/recording_cluster:artist",
-            "album": "kc:/music/recording_cluster:first album",
-            "release_date": "kc:/music/recording_cluster:release date",
-            "genre": "kc:/music/recording_cluster:skos_genre",
-        }
-        for key, path in data_to_find.items():
-            value = soup_object.find_all("div", attrs={"data-attrid": path})
-            if not value:
-                dict_metadata[key] = None
-                continue
-            value=value[-1]
-            value=value.text
-            new_str = unicodedata.normalize("NFKD", value.strip())
-            dict_metadata[key] = new_str.split(":")[-1].strip()
-        # print(dict_metadata)
-        # print(dict_metadata)
-        # parsed_content = soup_object.prettify()
-        # save_to_file(parsed_content, "parsed_content.html")
-        # print("Content parsed and saved successfully.")
+        # data_to_find = {
+        #     "artist": "kc:/music/recording_cluster:artist",
+        #     "album": "kc:/music/recording_cluster:first album",
+        #     "release_date": "kc:/music/recording_cluster:release date",
+        #     "genre": "kc:/music/recording_cluster:skos_genre",
+        # }
+        pattern = re.compile(r'kc:/music.*')
+        def match_pattern(tag):
+            return tag.name == 'div' and tag.has_attr('data-attrid') and pattern.match(tag['data-attrid'])
+        # Use the function with find_all to get matching divs
+        matching_divs = soup_object.find_all(match_pattern) # type: ignore
+        dict_metadata={}
+        for div in matching_divs:
+            data_attrid=div['data-attrid']
+            value=unicodedata.normalize("NFKD", div.text.strip())
+            # only split if we kniow there is only one : in the string
+            if value.count(':')==1:
+                value=value.split(':')[1].strip()
+            dict_metadata[data_attrid]=value
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
@@ -210,21 +233,28 @@ def from_two_list_create_new_dict(key_ref:list[str],key_val:list[str],dict_key_v
     return dict_with_new_value
 
 
-def get_metadata_discogs(music_name):
+def get_metadata_discogs(music_name,raise_error=False):
     keywords="discogs"
-    url = f"https://www.google.com/search?q={music_name}+{keywords}"
+    url_ori = f"https://www.google.com/search?q={music_name}+{keywords}"
     # print(url)
-    soup_object = fetch_and_parse_url(url)
-    # save_content(soup_object)
-    link_usefull=get_all_links(soup_object)
-    closest=get_close_matches(f'{keywords} {music_name}',link_usefull,cutoff=0.1)
+    soup_object = fetch_and_parse_url(url_ori)
+    save_content(soup_object)
+    link_usefull=[url for url in get_all_links(soup_object) if keywords in url and 'http' in url]
+    closest=get_close_matches(f'{music_name}',link_usefull,cutoff=0.3)
+    # breakpoint()
     # print(closest)
     good_url=None
     for url in closest:
         if 'release' in url:
             good_url=url
             break
-    assert good_url is not None,'Dit not found good url for discogs'
+        
+    if good_url is None:
+        if raise_error:
+            raise AssertionError(f'Did not find a good URL for Discogs: {url_ori} with {closest}')
+        else:
+            print(f'Did not find a good URL for Discogs: {url_ori} with {closest}')
+            return {}
 
     soup_object = fetch_and_parse_url(good_url.replace('https','http'))
     # breakpoint()
@@ -244,12 +274,22 @@ def test():
     closest=get_close_matches(f'{keywords} {music_name}',link_usefull,cutoff=0.1)
 
 def test_2():
-    name_music="Sokuu BRIZEL'KHEUR"
+    url="https://www.google.com/search?q=theodort+wayeh+%2B+GENRE"
     dict_val=MetadataEYED()
     # breakpoint()
-    dict_val.get_metadata_google(name_music)
-    dict_val.get_metadata_disco(name_music)
-    dict_val.show()
+    soup_object = fetch_and_parse_url(url)
+    # dict_val.get_metadata_google(name_music)
+    # Compile a regex that matches 'kc:/music' followed by anything
+    pattern = re.compile(r'kc:/music.*')
+    # Define a function that checks if 'data-attrid' matches the pattern
+    def match_pattern(tag):
+        return tag.name == 'div' and tag.has_attr('data-attrid') and pattern.match(tag['data-attrid'])
+    # Use the function with find_all to get matching divs
+    matching_divs = soup_object.find_all(match_pattern) # type: ignore
+
+    # Print the matching divs
+    for div in matching_divs:
+        print(div)
 
 if __name__ == "__main__":
     test_2()

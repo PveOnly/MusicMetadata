@@ -1,8 +1,14 @@
 import json
+import re
+import shutil
 from pathlib import Path
+
 from pytube import YouTube
-from src.utils import flatten_dict, sanitize_name,convert_mp4_to_mp3
+
+import src.genius_scrapping
 from src.genius_scrapping import MetadataEYED
+from src.utils import convert_mp4_to_mp3, flatten_dict, sanitize_name
+
 
 def download_video(url, output_path:Path,filename: str|None=None,force=False):
     # Create YouTube object
@@ -22,7 +28,7 @@ def download_video(url, output_path:Path,filename: str|None=None,force=False):
     if filename is None:
         filename=sanitize_name(yt.title)
         filename_mp4=filename+'.mp4'
-        filename_json=filename+"_extract_metadata.json"
+        filename_json=filename+"_extract_metadata_pytube.json"
     
     path_to_json=output_path/f'{filename_json}'
     path_to_mp4=output_path/f'{filename_mp4}'
@@ -57,39 +63,58 @@ def download_video(url, output_path:Path,filename: str|None=None,force=False):
 def main():
     # Example usage
     list_youtube_url = [
-        "https://www.youtube.com/watch?v=KNtJGQkC-WI",  # Replace with your YouTube URL,
+        "https://www.youtube.com/watch?v=ZWWjjLY2KPo",
+         "https://www.youtube.com/watch?v=KNtJGQkC-WI",  # Replace with your YouTube URL,
          "https://www.youtube.com/watch?v=0a1juREe4YQ",
          "https://www.youtube.com/watch?v=d3Un6waXXxE",
          "https://www.youtube.com/watch?v=hHBd9DNOLBg",
-         "https://www.youtube.com/watch?v=ZWWjjLY2KPo",
          "https://www.youtube.com/watch?v=tTq3h8pfPT0",
          "https://www.youtube.com/watch?v=a5InofcZEHQ",
          "https://www.youtube.com/watch?v=Q7yppe2b6II"
     ]
+    DUMP_JSON=True
     for youtube_url in list_youtube_url:
-        metadata_video_eyed3=MetadataEYED()
-        print(f"{youtube_url}")
         output_dir=Path('mp3_file')
         output_dir.mkdir(exist_ok=True)
-        path_to_video,video_metadata=download_video(youtube_url, output_dir,force=True)
+        metadata_video_eyed3=MetadataEYED(output_dir,dump_json=DUMP_JSON)
+        path_to_video,video_metadata=download_video(youtube_url, output_dir,force=False)
         metadata_video_eyed3.from_dict_metadata_update_self_metadata(video_metadata,force_replace=False)
-        # metadata_video_eyed3.is_metadata_complete()
-        metadata_video_eyed3.show()
-        # breakpoint()
-        # break
-        # def get maximun extra_data
         artist=metadata_video_eyed3.artist
         title=metadata_video_eyed3.title
         title_music=f"{artist} {title}"
-        metadata_video_eyed3.get_metadata_google(title_music)
-        if metadata_video_eyed3.is_metadata_complete():
-            metadata_video_eyed3.get_metadata_google(f"{artist} {title} GENRE")
-        if metadata_video_eyed3.is_metadata_complete():
+        print(f"{youtube_url} {title_music}")
+
+        if not metadata_video_eyed3.is_metadata_complete(minimal_key=True):
+            metadata_video_eyed3.get_metadata_google(f"{artist} GENRE")
+        if not metadata_video_eyed3.is_metadata_complete(minimal_key=True):
+            metadata_video_eyed3.get_metadata_google(title_music)
+        if not metadata_video_eyed3.is_metadata_complete(minimal_key=True):
+            metadata_video_eyed3.get_metadata_google(f"{title_music} GENRE")
+
+        if not metadata_video_eyed3.is_metadata_complete(minimal_key=True):
             metadata_video_eyed3.get_metadata_disco(title_music)
         # metadata_video_eyed3.show()
         convert_mp4_to_mp3(path_to_video)
         metadata_video_eyed3.from_metadata_update_mp3_video(path_to_video)
         print("###")
+        # break
+
+def test_2():
+    url="https://www.google.com/search?q=theodort+wayeh+%2B+GENRE"
+    # dict_val=MetadataEYED()
+    # breakpoint()
+    soup_object = src.genius_scrapping .fetch_and_parse_url(url)
+    pattern = re.compile(r'kc:/music.*')
+    def match_pattern(tag):
+        return tag.name == 'div' and tag.has_attr('data-attrid') and pattern.match(tag['data-attrid'])
+    # Use the function with find_all to get matching divs
+    matching_divs = soup_object.find_all(match_pattern) # type: ignore 
+    dict_metadata={}
+    for div in matching_divs:
+        data_attrid=div['data-attrid']
+        dict_metadata[data_attrid]=div.text
+    print(dict_metadata)
 
 if __name__ == "__main__":
     main()
+    # test_2()

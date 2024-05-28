@@ -24,7 +24,7 @@ def convert_mp4_to_mp3(input_file:Path):
         return 0
     cmd_ffmpeg.extend([input_file.as_posix(), output_file.as_posix()])
     exit_code=subprocess.run(cmd_ffmpeg,check=False)
-    print(exit_code)
+    return exit_code
 
 # def resize_image_to_jpeg_bytes(input_path):
 #     # Open an image file
@@ -43,8 +43,8 @@ def download_image_to_memory(image_url):
     # Send an HTTP GET request to the image URL
     response = requests.get(image_url)
     response.raise_for_status()  # Check for HTTP errors
-    with open('test.jpg','wb') as f:
-        f.write(response.content)
+    # with open('test.jpg','wb') as f:
+    #     f.write(response.content)
     return response.content
 
 MAPPING_COMMON_NON_FRENCH_ASCII_CHAR = {
@@ -129,7 +129,7 @@ def flatten_dict(d, parent_key='', sep='.'):
     return dict(items)
 
 def is_dict_has_none_key(dict_metadata: dict) -> bool:
-        return None in dict_metadata.keys()
+    return None in dict_metadata.keys()
 
 def convert_path_to_mp3_path(input_path:Path) -> Path:
     return input_path.parent/f'{input_path.stem}.mp3'
